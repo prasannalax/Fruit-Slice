@@ -75,6 +75,8 @@ lose_reason = ""
 popup_message = ""
 popup_timer = 0
 POPUP_DURATION = 1000
+LEVEL = 1
+FRUITS_TO_FILL = 5  # Level 1 fill requirement
 
 # Boxes setup for fruit fill
 box_width = 120
@@ -283,8 +285,8 @@ def spawn_fruit():
         "cut_anim": 0
     }
 
-def reset_game():
-    global score, timer, current_fruit, game_over, game_win, missed, start_ticks
+def reset_game(level=1):
+    global score, timer, current_fruit, game_over, game_win, missed, start_ticks, FRUITS_TO_FILL
     score = 0
     timer = 50
     current_fruit = None
@@ -292,9 +294,10 @@ def reset_game():
     game_win = False
     missed = 0
     start_ticks = pygame.time.get_ticks()
+    FRUITS_TO_FILL = 5 if level==1 else 6
     for b in boxes: b["fill"] = 0
     spawn_fruit()
-    play_background_music()  # <-- Restart background music
+    play_background_music()
 
 # ----------- Draw Boxes & Screens ----------
 def draw_boxes():
@@ -332,38 +335,49 @@ def game_over_screen():
                 pygame.quit(); sys.exit()
             if event.type==pygame.MOUSEBUTTONDOWN:
                 if button_rect.collidepoint(event.pos):
-                    reset_game()
+                    reset_game(level=LEVEL)
                     waiting=False
 
-def game_win_screen():
-    global game_win
+def level_completion_screen():
+    global LEVEL
     pygame.mixer.music.stop()
     if win_sound:
         win_sound.play()
 
     screen.fill(BLACK)
-    draw_text_with_outline("🎉 YOU WIN! 🎉",64,GREEN,BLACK,WIDTH//2,HEIGHT//3)
-    draw_text_with_outline(f"Final Score: {score}",40,WHITE,BLACK,WIDTH//2,HEIGHT//2)
+    draw_text_with_outline(f"Level {LEVEL} Completed!", 64, GREEN, BLACK, WIDTH//2, HEIGHT//3)
+    draw_text_with_outline(f"Score: {score}", 40, WHITE, BLACK, WIDTH//2, HEIGHT//2)
 
-    button_rect = pygame.Rect(WIDTH//2-100, HEIGHT//2+110, 200, 60)
-    pygame.draw.rect(screen, BLUE, button_rect, border_radius=10)
-    draw_text_with_outline("PLAY AGAIN",36,WHITE,BLACK,WIDTH//2, HEIGHT//2+140)
-    pygame.display.flip()
-    
+    continue_rect = pygame.Rect(WIDTH//2-120, HEIGHT//2+100, 100, 50)
+    quit_rect = pygame.Rect(WIDTH//2+20, HEIGHT//2+100, 100, 50)
+    pygame.draw.rect(screen, BLUE, continue_rect, border_radius=10)
+    pygame.draw.rect(screen, RED, quit_rect, border_radius=10)
+    draw_text_with_outline("CONTINUE",28,WHITE,BLACK,continue_rect.centerx, continue_rect.centery)
+    draw_text_with_outline("QUIT",28,WHITE,BLACK,quit_rect.centerx, quit_rect.centery)
+
     waiting = True
     while waiting:
         for event in pygame.event.get():
             if event.type==pygame.QUIT:
                 pygame.quit(); sys.exit()
             if event.type==pygame.MOUSEBUTTONDOWN:
-                if button_rect.collidepoint(event.pos):
-                    reset_game()
-                    waiting=False
+                if continue_rect.collidepoint(event.pos):
+                    LEVEL += 1
+                    reset_game(level=LEVEL)
+                    waiting = False
+                elif quit_rect.collidepoint(event.pos):
+                    pygame.quit(); sys.exit()
+        pygame.display.flip()
+        clock.tick(FPS)
+
+def game_win_screen():
+    # Redirect to level completion screen
+    level_completion_screen()
 
 # ----------- Main Loop ----------
 def main_game_loop():
     global current_fruit, game_over, game_win, score, timer, missed, popup_message, popup_timer, lose_reason
-    reset_game()
+    reset_game(LEVEL)
     while True:
         dt = clock.tick(FPS)
         screen.fill(WHITE)
@@ -380,7 +394,7 @@ def main_game_loop():
                     score += 1
                     for b in boxes:
                         if b["fruit"]==current_fruit["type"]:
-                            b["fill"] += 0.2
+                            b["fill"] += 1/FRUITS_TO_FILL
                             if b["fill"]>1: b["fill"]=1
                             break
                     if fill_sound: fill_sound.play()
@@ -442,7 +456,7 @@ def main_game_loop():
         # Game over / win
         if game_over:
             game_over_screen()
-        if game_win or all(b["fill"] >= 1 for b in boxes):
+        if all(b["fill"] >= 1 for b in boxes):
             game_win = True
             game_win_screen()
 
