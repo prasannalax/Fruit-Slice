@@ -34,6 +34,8 @@ try: fill_sound = pygame.mixer.Sound("fill.wav")
 except: fill_sound = None
 try: win_sound = pygame.mixer.Sound("win.wav")
 except: win_sound = None
+try: lose_sound = pygame.mixer.Sound("lose.wav")
+except: lose_sound = None
 
 # ----------- Images -------------
 def load_image(name, color, size=(70,70)):
@@ -101,6 +103,15 @@ def draw_text_with_outline(text, size, color, outline_color, x, y, center=True):
         screen.blit(outline, rect.move(dx,dy))
     screen.blit(surf, rect)
 
+def play_background_music():
+    """Play looping background music."""
+    try:
+        pygame.mixer.music.load("game_bg.mp3")
+        pygame.mixer.music.set_volume(0.5)
+        pygame.mixer.music.play(-1)
+    except:
+        print("Warning: Could not play background music.")
+
 # ----------- Front Page ----------
 def front_page():
     try:
@@ -109,13 +120,7 @@ def front_page():
     except:
         bg_image = None
 
-    # Play background music for menu/game
-    try:
-        pygame.mixer.music.load("game_bg.mp3")
-        pygame.mixer.music.set_volume(0.5)
-        pygame.mixer.music.play(-1)
-    except:
-        print("Warning: Could not play background music.")
+    play_background_music()
 
     fruit_icons = []
     for f_name, img in fruit_images.items():
@@ -225,13 +230,7 @@ def gift_box_unlock():
     popup_msg = ""
     reveal_key = False
 
-    # Background music for mini-game
-    try:
-        pygame.mixer.music.load("game_bg.mp3")
-        pygame.mixer.music.set_volume(0.5)
-        pygame.mixer.music.play(-1)
-    except:
-        pass
+    play_background_music()  # Start mini-game background music
 
     while not unlocked:
         screen.fill(WHITE)
@@ -295,6 +294,7 @@ def reset_game():
     start_ticks = pygame.time.get_ticks()
     for b in boxes: b["fill"] = 0
     spawn_fruit()
+    play_background_music()  # <-- Restart background music
 
 # ----------- Draw Boxes & Screens ----------
 def draw_boxes():
@@ -310,15 +310,21 @@ def draw_boxes():
 
 def game_over_screen():
     global game_over
+    pygame.mixer.music.stop()
+    if lose_sound:
+        lose_sound.play()
+
     screen.fill(BLACK)
     draw_text_with_outline("GAME OVER!",64,RED,WHITE,WIDTH//2,HEIGHT//3)
     draw_text_with_outline(f"Score: {score}",40,WHITE,BLACK,WIDTH//2,HEIGHT//2)
     if lose_reason:
         draw_text_with_outline(lose_reason,30,YELLOW,BLACK,WIDTH//2,HEIGHT//2+50)
+    
     button_rect = pygame.Rect(WIDTH//2-100, HEIGHT//2+110, 200, 60)
     pygame.draw.rect(screen, BLUE, button_rect, border_radius=10)
     draw_text_with_outline("RESTART",36,WHITE,BLACK,WIDTH//2, HEIGHT//2+140)
     pygame.display.flip()
+
     waiting = True
     while waiting:
         for event in pygame.event.get():
@@ -331,13 +337,19 @@ def game_over_screen():
 
 def game_win_screen():
     global game_win
+    pygame.mixer.music.stop()
+    if win_sound:
+        win_sound.play()
+
     screen.fill(BLACK)
     draw_text_with_outline("🎉 YOU WIN! 🎉",64,GREEN,BLACK,WIDTH//2,HEIGHT//3)
     draw_text_with_outline(f"Final Score: {score}",40,WHITE,BLACK,WIDTH//2,HEIGHT//2)
+
     button_rect = pygame.Rect(WIDTH//2-100, HEIGHT//2+110, 200, 60)
     pygame.draw.rect(screen, BLUE, button_rect, border_radius=10)
     draw_text_with_outline("PLAY AGAIN",36,WHITE,BLACK,WIDTH//2, HEIGHT//2+140)
     pygame.display.flip()
+    
     waiting = True
     while waiting:
         for event in pygame.event.get():
