@@ -26,23 +26,16 @@ font = pygame.font.SysFont("arial", 28)
 big_font = pygame.font.SysFont("arial", 48)
 
 # ----------- Sounds -------------
-try:
-    cut_sound = pygame.mixer.Sound("cut.wav")
-except:
-    cut_sound = None
-try:
-    fill_sound = pygame.mixer.Sound("fill.wav")
-except:
-    fill_sound = None
-try:
-    win_sound = pygame.mixer.Sound("win.wav")
-except:
-    win_sound = None
+try: cut_sound = pygame.mixer.Sound("cut.wav")
+except: cut_sound = None
+try: fill_sound = pygame.mixer.Sound("fill.wav")
+except: fill_sound = None
+try: win_sound = pygame.mixer.Sound("win.wav")
+except: win_sound = None
 try:
     pygame.mixer.music.load("background.mp3")
     pygame.mixer.music.play(-1)
-except:
-    pass
+except: pass
 
 # ----------- Images -------------
 def load_image(name, color, size=(70,70)):
@@ -63,12 +56,8 @@ fruit_images = {
     "Strawberry": load_image("strawberry.png", RED),
 }
 fruit_colors = {
-    "Apple": RED,
-    "Banana": YELLOW,
-    "Mango": ORANGE,
-    "Grape": PURPLE,
-    "Orange": ORANGE,
-    "Strawberry": RED,
+    "Apple": RED, "Banana": YELLOW, "Mango": ORANGE,
+    "Grape": PURPLE, "Orange": ORANGE, "Strawberry": RED,
 }
 
 # ----------- Game Variables -----
@@ -76,9 +65,8 @@ clock = pygame.time.Clock()
 FPS = 60
 score = 0
 timer = 50
-fruit_speed = 1.5
-fruits = []
-fruit_queue = []
+fruit_speed = 5
+current_fruit = None  # Only one fruit at a time
 game_over = False
 game_win = False
 missed = 0
@@ -88,14 +76,6 @@ lose_reason = ""
 popup_message = ""
 popup_timer = 0
 POPUP_DURATION = 1000
-
-# Timer pause tracking
-paused_time = 0
-pause_start = None
-
-# Fruit spawn delay
-fruit_spawn_interval = 2000  # 2 seconds
-last_fruit_spawn_time = 0
 
 # Boxes setup
 box_width = 120
@@ -113,56 +93,47 @@ for i, name in enumerate(fruit_list):
     })
 
 # ----------- Functions ----------
-def spawn_fruits():
-    global fruit_queue
-    fruit_queue = []
+def get_available_fruits():
+    """Return list of fruits whose boxes are not yet full"""
+    available = [b["fruit"] for b in boxes if b["fill"] < 1]
+    return available
 
-    # Fruits queue (3 fruits each level)
-    choices = random.sample(list(fruit_images.keys()), 3)
-    for c in choices:
-        fruit_queue.append({
-            "type": c,
-            "image": fruit_images[c],
-            "x": random.randint(50, WIDTH-100),
-            "y": -80 - random.randint(0,150),
-            "letter": random.choice(string.ascii_uppercase),
-            "cut": False,
-            "cut_anim": 0
-        })
+def spawn_fruit():
+    global current_fruit
+    available = get_available_fruits()
+    if not available:
+        current_fruit = None
+        return
+    c = random.choice(available)
+    current_fruit = {
+        "type": c,
+        "image": fruit_images[c],
+        "x": random.randint(50, WIDTH-100),
+        "y": -80,
+        "letter": random.choice(string.ascii_uppercase),
+        "cut": False,
+        "cut_anim": 0
+    }
 
 def reset_game():
-    global score, timer, fruit_speed, fruits, fruit_queue
-    global game_over, game_win, missed, start_ticks, boxes, lose_reason
-    global popup_message, popup_timer, last_fruit_spawn_time
-    global paused_time, pause_start
+    global score, timer, current_fruit, game_over, game_win, missed, start_ticks
     score = 0
     timer = 50
-    fruit_speed = 1.5
-    fruits = []
-    fruit_queue = []
+    current_fruit = None
     game_over = False
     game_win = False
     missed = 0
-    lose_reason = ""
-    popup_message = ""
-    popup_timer = 0
     start_ticks = pygame.time.get_ticks()
-    last_fruit_spawn_time = 0
-    paused_time = 0
-    pause_start = None
-    for b in boxes:
-        b["fill"] = 0
-    spawn_fruits()
+    for b in boxes: b["fill"] = 0
+    spawn_fruit()
 
 def draw_text_with_outline(text, size, color, outline_color, x, y, center=True):
     f = pygame.font.SysFont("arial", size, bold=True)
     surf = f.render(text, True, color)
     outline = f.render(text, True, outline_color)
     rect = surf.get_rect()
-    if center:
-        rect.center = (x,y)
-    else:
-        rect.topleft = (x,y)
+    if center: rect.center = (x,y)
+    else: rect.topleft = (x,y)
     for dx, dy in [(-2,0),(2,0),(0,-2),(0,2)]:
         screen.blit(outline, rect.move(dx,dy))
     screen.blit(surf, rect)
@@ -181,16 +152,13 @@ def game_over_screen():
     while waiting:
         for event in pygame.event.get():
             if event.type==pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                pygame.quit(); sys.exit()
             if event.type==pygame.MOUSEBUTTONDOWN:
                 if button_rect.collidepoint(event.pos):
                     reset_game()
                     waiting=False
 
 def game_win_screen():
-    if win_sound:
-        win_sound.play()
     screen.fill(BLACK)
     draw_text_with_outline("🎉 YOU WIN! 🎉",64,GREEN,BLACK,WIDTH//2,HEIGHT//3)
     draw_text_with_outline(f"Final Score: {score}",40,WHITE,BLACK,WIDTH//2,HEIGHT//2)
@@ -202,8 +170,7 @@ def game_win_screen():
     while waiting:
         for event in pygame.event.get():
             if event.type==pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                pygame.quit(); sys.exit()
             if event.type==pygame.MOUSEBUTTONDOWN:
                 if button_rect.collidepoint(event.pos):
                     reset_game()
@@ -221,17 +188,11 @@ def draw_boxes():
         draw_text_with_outline(b["fruit"],20,BLACK,WHITE,rect.centerx,b["y"]+box_height+15)
 
 # ----------- Main Loop ----------
-spawn_fruits()
+reset_game()
 running = True
 while running:
     dt = clock.tick(FPS)
     screen.fill(WHITE)
-
-    # Fruit spawn with delay
-    current_time = pygame.time.get_ticks()
-    if fruit_queue and current_time - last_fruit_spawn_time >= fruit_spawn_interval:
-        fruits.append(fruit_queue.pop(0))
-        last_fruit_spawn_time = current_time
 
     # Events
     for event in pygame.event.get():
@@ -239,23 +200,18 @@ while running:
             running=False
         if not game_over and not game_win and event.type==pygame.KEYDOWN:
             key = event.unicode.upper()
-            found=False
-            # Fruits
-            for f in fruits:
-                if not f["cut"] and f["letter"]==key:
-                    f["cut"]=True
-                    f["cut_anim"]=10
-                    score+=1
-                    for b in boxes:
-                        if b["fruit"]==f["type"]:
-                            b["fill"]+=0.2
-                            if b["fill"]>1: b["fill"]=1
-                            break
-                    if fill_sound: fill_sound.play()
-                    if cut_sound: cut_sound.play()
-                    found=True
-                    break
-            if not found:
+            if current_fruit and not current_fruit["cut"] and current_fruit["letter"]==key:
+                current_fruit["cut"] = True
+                current_fruit["cut_anim"] = 10
+                score += 1
+                for b in boxes:
+                    if b["fruit"]==current_fruit["type"]:
+                        b["fill"] += 0.2
+                        if b["fill"]>1: b["fill"]=1
+                        break
+                if fill_sound: fill_sound.play()
+                if cut_sound: cut_sound.play()
+            elif current_fruit:
                 game_over=True
                 lose_reason = "Wrong key pressed!"
                 popup_message = "Wrong key!"
@@ -263,50 +219,39 @@ while running:
 
     # Timer
     if not game_over and not game_win:
-        # pause timer while any fruit is in cut animation
-        if any(f["cut_anim"] > 0 for f in fruits):
-            if pause_start is None:
-                pause_start = pygame.time.get_ticks()
-        else:
-            if pause_start is not None:
-                paused_time += pygame.time.get_ticks() - pause_start
-                pause_start = None
-        seconds = (pygame.time.get_ticks()-start_ticks - paused_time)//1000
+        seconds = (pygame.time.get_ticks()-start_ticks)//1000
         timer=50-seconds
         if timer<=0:
             game_over=True
             lose_reason = "Time's up!"
 
-    # Update fruits
-    if not game_over and not game_win:
-        for f in fruits[:]:
-            if not f["cut"]:
-                f["y"]+=fruit_speed
-                if f["y"]>HEIGHT:
-                    missed += 1
-                    popup_message = "Missed a fruit!"
-                    popup_timer = pygame.time.get_ticks()
-                    if missed >= MAX_MISSES:
-                        game_over = True
-                        lose_reason = "Too many fruits missed!"
-                    fruits.remove(f)
-            elif f["cut_anim"]>0:
-                f["cut_anim"] -= 1
-                f["y"] -= 2
-                if f["cut_anim"] <= 0:
-                    fruits.remove(f)
+    # Update fruit
+    if current_fruit:
+        if not current_fruit["cut"]:
+            current_fruit["y"] += fruit_speed
+            if current_fruit["y"] > HEIGHT:
+                missed += 1
+                popup_message = "Missed a fruit!"
+                popup_timer = pygame.time.get_ticks()
+                if missed >= MAX_MISSES:
+                    game_over = True
+                    lose_reason = "Too many fruits missed!"
+                current_fruit = None
+        elif current_fruit["cut_anim"] > 0:
+            current_fruit["cut_anim"] -= 1
+            current_fruit["y"] -= 2
+        else:
+            current_fruit = None
 
-        if not fruit_queue and not fruits:  # next level spawn
-            spawn_fruits()
-            fruit_speed += 0.15
+    # Spawn next fruit if none exists
+    if not current_fruit and not game_over and not game_win:
+        spawn_fruit()
 
-        if all(b["fill"] >= 1 for b in boxes):
-            game_win = True
-
-    # Draw fruits
-    for f in fruits:
-        screen.blit(f["image"], (f["x"], f["y"]))
-        draw_text_with_outline(f["letter"], 28, WHITE, BLACK, f["x"]+35, f["y"]-20)
+    # Draw current fruit
+    if current_fruit:
+        screen.blit(current_fruit["image"], (current_fruit["x"], current_fruit["y"]))
+        draw_text_with_outline(current_fruit["letter"], 28, WHITE, BLACK,
+                               current_fruit["x"]+35, current_fruit["y"]-20)
 
     # Draw boxes
     draw_boxes()
@@ -323,7 +268,8 @@ while running:
     # Game over / win
     if game_over:
         game_over_screen()
-    if game_win:
+    if game_win or all(b["fill"] >= 1 for b in boxes):
+        game_win = True
         game_win_screen()
 
     pygame.display.flip()
