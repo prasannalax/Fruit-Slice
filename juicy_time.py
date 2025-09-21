@@ -89,6 +89,10 @@ popup_message = ""
 popup_timer = 0
 POPUP_DURATION = 1000
 
+# Timer pause tracking
+paused_time = 0
+pause_start = None
+
 # Fruit spawn delay
 fruit_spawn_interval = 2000  # 2 seconds
 last_fruit_spawn_time = 0
@@ -130,6 +134,7 @@ def reset_game():
     global score, timer, fruit_speed, fruits, fruit_queue
     global game_over, game_win, missed, start_ticks, boxes, lose_reason
     global popup_message, popup_timer, last_fruit_spawn_time
+    global paused_time, pause_start
     score = 0
     timer = 50
     fruit_speed = 1.5
@@ -143,6 +148,8 @@ def reset_game():
     popup_timer = 0
     start_ticks = pygame.time.get_ticks()
     last_fruit_spawn_time = 0
+    paused_time = 0
+    pause_start = None
     for b in boxes:
         b["fill"] = 0
     spawn_fruits()
@@ -256,7 +263,15 @@ while running:
 
     # Timer
     if not game_over and not game_win:
-        seconds=(pygame.time.get_ticks()-start_ticks)//1000
+        # pause timer while any fruit is in cut animation
+        if any(f["cut_anim"] > 0 for f in fruits):
+            if pause_start is None:
+                pause_start = pygame.time.get_ticks()
+        else:
+            if pause_start is not None:
+                paused_time += pygame.time.get_ticks() - pause_start
+                pause_start = None
+        seconds = (pygame.time.get_ticks()-start_ticks - paused_time)//1000
         timer=50-seconds
         if timer<=0:
             game_over=True
